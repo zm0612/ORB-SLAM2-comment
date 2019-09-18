@@ -24,18 +24,18 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-#include<mutex>
+#include <mutex>
 
 namespace ORB_SLAM2
 {
 
 FrameDrawer::FrameDrawer(Map* pMap):mpMap(pMap)
 {
-    mState=Tracking::SYSTEM_NOT_READY;
+    mState = Tracking::SYSTEM_NOT_READY;
     // 初始化图像显示画布
     // 包括：图像、特征点连线形成的轨迹（初始化时）、框（跟踪时的MapPoint）、圈（跟踪时的特征点）
     // ！！！固定画布大小为640*480
-    mIm = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
+    mIm = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));//v0,v1,v2分别是BGR
 }
 
 // 准备需要显示的信息，包括图像、特征点、地图、跟踪状态
@@ -53,7 +53,7 @@ cv::Mat FrameDrawer::DrawFrame()
     // 加互斥锁，避免与FrameDrawer::Update函数中图像拷贝发生冲突
     {
         unique_lock<mutex> lock(mMutex);
-        state=mState;
+        state=mState;//跟踪状态
         if(mState==Tracking::SYSTEM_NOT_READY)
             mState=Tracking::NO_IMAGES_YET;
 
@@ -78,7 +78,7 @@ cv::Mat FrameDrawer::DrawFrame()
         }
     } // destroy scoped mutex -> release mutex
 
-    if(im.channels()<3) //this should be always true
+    if(im.channels() < 3) //this should be always true
         cvtColor(im,im,CV_GRAY2BGR);
 
     //Draw
@@ -91,7 +91,7 @@ cv::Mat FrameDrawer::DrawFrame()
             if(vMatches[i]>=0)
             {
                 cv::line(im,vIniKeys[i].pt,vCurrentKeys[vMatches[i]].pt,
-                        cv::Scalar(0,255,0));
+                        cv::Scalar(0,255,0));//画出参考帧和当前帧的轨迹连线
             }
         }
     }
@@ -105,7 +105,7 @@ cv::Mat FrameDrawer::DrawFrame()
         const int n = vCurrentKeys.size();
         for(int i=0;i<n;i++)
         {
-            if(vbVO[i] || vbMap[i])
+            if(vbVO[i] || vbMap[i])//跟踪的mappoints在当前帧
             {
                 //在特征点附近正方形选择四个点
                 cv::Point2f pt1,pt2;
@@ -118,6 +118,7 @@ cv::Mat FrameDrawer::DrawFrame()
                 // 步骤2.2：正常跟踪时，在画布im中标注特征点
                 if(vbMap[i])
                 {
+                    //ORB-SLAM2中关键点对应的地图点在当前帧可以观测到，那么关键点用方框加上圆点表示
                     // 通道顺序为bgr，地图中MapPoints用绿色圆点表示，并用绿色小方框圈住
                     cv::rectangle(im,pt1,pt2,cv::Scalar(0,255,0));
                     cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(0,255,0),-1);
@@ -125,6 +126,7 @@ cv::Mat FrameDrawer::DrawFrame()
                 }
                 else // This is match to a "visual odometry" MapPoint created in the last frame
                 {
+                    //如果地图点对应的不是当前帧，那么就蓝色的方框和圆点表示
                     // 通道顺序为bgr，仅当前帧能观测到的MapPoints用蓝色圆点表示，并用蓝色小方框圈住
                     cv::rectangle(im,pt1,pt2,cv::Scalar(255,0,0));
                     cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(255,0,0),-1);
