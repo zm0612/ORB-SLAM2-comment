@@ -39,6 +39,7 @@ FrameDrawer::FrameDrawer(Map* pMap):mpMap(pMap)
 }
 
 // 准备需要显示的信息，包括图像、特征点、地图、跟踪状态
+//主要是用来画特征点和运动轨迹
 cv::Mat FrameDrawer::DrawFrame()
 {
     cv::Mat im;
