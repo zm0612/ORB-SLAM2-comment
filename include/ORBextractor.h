@@ -114,7 +114,7 @@ protected:
     std::vector<cv::Point> pattern;//存储关键点附近patch的点对
 
     int nfeatures;//提取特征点的最大数量 zzm:这里的特征点数量是所有金字塔上的特征点的总数
-    double scaleFactor;//每层之间的缩放比例
+    double scaleFactor;//每层之间的缩放比例 1 1.2 1.44 ...
     int nlevels;//金字塔的层数
     int iniThFAST;//iniThFAST提取FAST角点时的初始阈值
     int minThFAST;//minThFAST提取FAST角点时更小的阈值

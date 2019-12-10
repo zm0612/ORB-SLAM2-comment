@@ -228,7 +228,6 @@ private:
     cv::Mat mRwc; ///< Rotation from camera to world
     cv::Mat mOw;  ///< mtwc,Translation from camera to world
 };
-
 }// namespace ORB_SLAM
 
 #endif // FRAME_H

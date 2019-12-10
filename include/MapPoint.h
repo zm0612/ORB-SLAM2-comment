@@ -135,7 +135,7 @@ protected:
     //这里的的size_t对应的是关键帧中关键点的索引号码
 
     // Mean viewing direction
-    // 该MapPoint平均观测方向
+    // 该MapPoint平均被观测方向。一个地图点可能被多个关键帧观测到，会有很多被观测方向
     cv::Mat mNormalVector;
 
     // Best descriptor to fast matching
@@ -166,5 +166,4 @@ protected:
 };
 
 } //namespace ORB_SLAM
-
 #endif // MAPPOINT_H

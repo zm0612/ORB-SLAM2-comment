@@ -175,6 +175,8 @@ public:
     // 和Frame类中的定义相同
     const std::vector<cv::KeyPoint> mvKeys;
     const std::vector<cv::KeyPoint> mvKeysUn;
+
+    //对于双目，mvuRight存储了左目像素点在右目中的对应点的横坐标
     const std::vector<float> mvuRight; // negative value for monocular points
     const std::vector<float> mvDepth; // negative value for monocular points
     const cv::Mat mDescriptors;

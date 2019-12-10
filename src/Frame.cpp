@@ -308,8 +308,8 @@ void Frame::UpdatePoseMatrices()
     mRwc = mRcw.t();
     mtcw = mTcw.rowRange(0,3).col(3);
     // mtcw, 即相机坐标系下相机坐标系到世界坐标系间的向量, 向量方向由相机坐标系指向世界坐标系
-    // mOw, 即世界坐标系下世界坐标系到相机坐标系间的向量, 向量方向由世界坐标系指向相机坐标系
-    mOw = -mRcw.t()*mtcw;
+    //  mOw, 即世界坐标系下世界坐标系到相机坐标系间的向量, 向量方向由世界坐标系指向相机坐标系
+    mOw = -mRcw.t()*mtcw;//Pw = Rwc*Pc + twc => Rcw^T * Pc = Pw + Rcw^T * tcw
 }
 
 /**

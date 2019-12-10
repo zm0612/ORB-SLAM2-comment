@@ -26,7 +26,7 @@
 namespace ORB_SLAM2
 {
 
-long unsigned int MapPoint::nNextId=0;//静态成员变量必须这样初始化
+long unsigned int MapPoint::nNextId=0;//静态成员变量必须类外初始化
 mutex MapPoint::mGlobalMutex;
 
 /**
@@ -44,7 +44,7 @@ MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap):
     mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
     mpReplaced(static_cast<MapPoint*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap)
 {
-    Pos.copyTo(mWorldPos);
+    Pos.copyTo(mWorldPos);//深度拷贝Pos到mWorldPos
     mNormalVector = cv::Mat::zeros(3,1,CV_32F);//该地图点的平均观测方向
 
     // MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
@@ -80,6 +80,7 @@ MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF
     const int nLevels = pFrame->mnScaleLevels;//金字塔的层数
 
     // 另见PredictScale函数前的注释
+    //如果是8层，并且缩放比是1.2的金字塔，那么mfMaxDistance = dist * 1.2;  mfMinDistance = mfMaxDistance / 1.2^(7);
     mfMaxDistance = dist * levelScaleFactor;
     mfMinDistance = mfMaxDistance/pFrame->mvScaleFactors[nLevels-1];
 
@@ -139,6 +140,7 @@ void MapPoint::AddObservation(KeyFrame* pKF, size_t idx)
         nObs++; // 单目
 }
 
+///删除可以观测到该MapPoint的KeyFrame
 void MapPoint::EraseObservation(KeyFrame* pKF)
 {
     bool bBad=false;
@@ -148,7 +150,7 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
         if(mObservations.count(pKF))
         {
             int idx = mObservations[pKF];
-            if(pKF->mvuRight[idx]>=0)
+            if(pKF->mvuRight[idx]>=0) //判断是单目还是双目
                 nObs-=2;
             else
                 nObs--;
@@ -166,6 +168,7 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
         }
     }
 
+    //如果观测到该点的KeyFrame不大于两个，那就删掉这个MapPoint
     if(bBad)
         SetBadFlag();
 }
@@ -279,7 +282,7 @@ void MapPoint::IncreaseVisible(int n)
 /**
  * @brief Increase Found
  *
- * 能找到该点的帧数+n，n默认为1
+ * 能找到该点的帧数+n，即就是能和特征点对应上的帧，n默认为1
  * @see Tracking::TrackLocalMap()
  */
 void MapPoint::IncreaseFound(int n)
@@ -305,10 +308,14 @@ float MapPoint::GetFoundRatio()
  * 由于一个MapPoint会被许多相机观测到，因此在插入关键帧后，需要判断是否更新当前点的最适合的描述子 \n
  * 先获得当前点的所有描述子，然后计算描述子之间的两两距离，最好的描述子与其他描述子应该具有最小的距离中值
  * @see III - C3.3
+ * Distinctive 独特的，代表性的
+ *
+ * 这里使用了一个二维矩阵Distances,在Distances[i][j]位置存放的是vDescriptors中i和j描述子之间的距离.
  */
+
 void MapPoint::ComputeDistinctiveDescriptors()
 {
-    // Retrieve all observed descriptors
+    // Retrieve(恢复) all observed descriptors
     vector<cv::Mat> vDescriptors;
 
     map<KeyFrame*,size_t> observations;
@@ -340,10 +347,9 @@ void MapPoint::ComputeDistinctiveDescriptors()
     // Compute distances between them
     // 获得这些描述子两两之间的距离
     const size_t N = vDescriptors.size();
-	
     //float Distances[N][N];
 	std::vector<std::vector<float> > Distances;
-	Distances.resize(N, vector<float>(N, 0));
+	Distances.resize(N, vector<float>(N, 0));//对于二维的vector可以采用这种方式初始化
 	for (size_t i = 0; i<N; i++)
     {
         Distances[i][i]=0;
@@ -358,12 +364,15 @@ void MapPoint::ComputeDistinctiveDescriptors()
     // Take the descriptor with least median distance to the rest
     int BestMedian = INT_MAX;
     int BestIdx = 0;
+
+    //这里的策略是：按行遍历，先对第0行，寻找序号为0的描述子与其它描述子的距离中位数。
+    //然后继续下一行，直到某一行的一个中位数是所有行中的最小的一个，那么它对应的描述子就是这个MapPoint的描述子
     for(size_t i=0;i<N;i++)
     {
         // 第i个描述子到其它所有所有描述子之间的距离
         //vector<int> vDists(Distances[i],Distances[i]+N);
 		vector<int> vDists(Distances[i].begin(), Distances[i].end());
-		sort(vDists.begin(), vDists.end());
+		sort(vDists.begin(), vDists.end());//按照升序排列
 
         // 获得中值
         int median = vDists[0.5*(N-1)];
@@ -442,14 +451,14 @@ void MapPoint::UpdateNormalAndDepth()
     for(map<KeyFrame*,size_t>::iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
     {
         KeyFrame* pKF = mit->first;
-        cv::Mat Owi = pKF->GetCameraCenter();//关键帧相对于世界的平移矩阵
-        cv::Mat normali = mWorldPos - Owi;//关键帧到Mappoint的矩阵
-        normal = normal + normali/cv::norm(normali); // 对所有关键帧对该点的观测方向归一化为单位向量进行求和
+        cv::Mat Owi = pKF->GetCameraCenter();//关键帧中心到世界坐标系的平移向量
+        cv::Mat normali = mWorldPos - Owi;//关键帧中心指向Mappoint的向量(在世界坐标系下的表示)
+        normal = normal + normali/cv::norm(normali); //对所有关键帧对该点的观测方向归一化为单位向量进行求和
         n++;
     } 
 
-    cv::Mat PC = Pos - pRefKF->GetCameraCenter(); // 参考关键帧相机指向3D点的向量（在世界坐标系下的表示）
-    const float dist = cv::norm(PC); // 该点到参考关键帧相机的距离
+    cv::Mat PC = Pos - pRefKF->GetCameraCenter(); // 参考关键帧原点指向MapPoint的向量（在世界坐标系下的表示）
+    const float dist = cv::norm(PC); //该MapPoint到参考关键帧原点的距离
     const int level = pRefKF->mvKeysUn[observations[pRefKF]].octave;
     const float levelScaleFactor =  pRefKF->mvScaleFactors[level];
     const int nLevels = pRefKF->mnScaleLevels; // 金字塔层数
@@ -481,7 +490,6 @@ float MapPoint::GetMaxDistanceInvariance()
 //因此会希望距离相机近的点的搜索范围更大一点,距离相机更远的点的搜索范围更小一点,
 // 所以要在这里,根据点到关键帧/帧的距离来估计它在当前的关键帧/帧中,
 //会大概处于哪个尺度
-
 //              ____
 // Nearer      /____\     level:n-1 --> dmin
 //            /______\                       d/dmin = 1.2^(n-1-m)
@@ -528,7 +536,4 @@ int MapPoint::PredictScale(const float &currentDist, Frame* pF)
 
     return nScale;
 }
-
-
-
 } //namespace ORB_SLAM
