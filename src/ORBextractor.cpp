@@ -592,7 +592,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint> 
     }
 
     //Associate points to childs
-    //要一直记得vToDistributeKeys变量中存储的是该层图像中提取的特征点
+    ///要一直记得vToDistributeKeys变量中存储的是该层图像中提取的特征点
     //遍历在该层图像上提取的所有特征点
     for (size_t i = 0; i < vToDistributeKeys.size(); i++) {
         const cv::KeyPoint &kp = vToDistributeKeys[i];
@@ -818,6 +818,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint> 
     return vResultKeys;
 }
 
+/// 计算原始灰度图的关键点，当前没有牵扯任何去畸变操作
 //allKeypoints：每一层金字塔上的关键点
 void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> > &allKeypoints) {
     allKeypoints.resize(nlevels);
@@ -826,7 +827,7 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> > &allKeypoin
 
     // 对每一层图像做处理
     for (int level = 0; level < nlevels; ++level) {
-        const int minBorderX = EDGE_THRESHOLD - 3;
+        const int minBorderX = EDGE_THRESHOLD - 3;// =16
         const int minBorderY = minBorderX;
         const int maxBorderX = mvImagePyramid[level].cols - EDGE_THRESHOLD + 3;
         const int maxBorderY = mvImagePyramid[level].rows - EDGE_THRESHOLD + 3;
@@ -837,11 +838,11 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> > &allKeypoin
         const float width = (maxBorderX - minBorderX);
         const float height = (maxBorderY - minBorderY);
 
-        //每行和每列各有多少个格子
+        ///下面四行代码目的是按照图片大小分成竟可能多的栅格，并且每个栅格大小接近30x30
         const int nCols = width / W;
         const int nRows = height / W;
         //每个格子长度和宽度的大小
-        const int wCell = ceil(width / nCols);
+        const int wCell = ceil(width / nCols);//向上取整
         const int hCell = ceil(height / nRows);
 
         for (int i = 0; i < nRows; i++) {
@@ -866,11 +867,14 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> > &allKeypoin
                 FAST(mvImagePyramid[level].rowRange(iniY, maxY).colRange(iniX, maxX),
                      vKeysCell, iniThFAST, true);
 
+                //如果使用iniThFAST阈值没有提取到关键点，那就使用minThFAST
                 if (vKeysCell.empty()) {
                     FAST(mvImagePyramid[level].rowRange(iniY, maxY).colRange(iniX, maxX),
                          vKeysCell, minThFAST, true);
                 }
 
+                //恢复关键点在整张图片中的真实的坐标. 注意坐标原点是金字塔原点x,y方向都加上16
+                //也就是原始灰度图的原点x,y方向都减去3
                 if (!vKeysCell.empty()) {
                     for (vector<cv::KeyPoint>::iterator vit = vKeysCell.begin(); vit != vKeysCell.end(); vit++) {
                         (*vit).pt.x += j * wCell;
@@ -878,7 +882,6 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> > &allKeypoin
                         vToDistributeKeys.push_back(*vit);
                     }
                 }
-
             }
         }
 
@@ -895,7 +898,7 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> > &allKeypoin
         const int nkps = keypoints.size();
         for (int i = 0; i < nkps; i++) {
             keypoints[i].pt.x += minBorderX;//注意这里的keypoints是对allKeypoints[i]的引用
-            keypoints[i].pt.y += minBorderY;
+            keypoints[i].pt.y += minBorderY;//最后关键的坐标原点是相对于金字塔图层原点
             keypoints[i].octave = level;
             keypoints[i].size = scaledPatchSize;
         }
@@ -1080,7 +1083,7 @@ void ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoi
 
     // Pre-compute the scale pyramid
     // 构建图像金字塔
-    ComputePyramid(image);
+    ComputePyramid(image);//金字塔图层结果存储在mvImagePyramid中
 
     // 计算每层图像的兴趣点
     vector<vector<KeyPoint> > allKeypoints; // vector<vector<KeyPoint>>
@@ -1134,14 +1137,16 @@ void ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoi
 
 /**
  * 构建图像金字塔
- * 主要完成的功能为，将输入图像进行边缘扩充，然后对图片进行尺寸缩放形成图像金字塔
+ * 将图像进行逐次缩放，然后再将缩放后的图像进行边缘扩充，各个边往外扩充19个像素
  * @param image 输入图像
  */
 void ORBextractor::ComputePyramid(cv::Mat image) {
     for (int level = 0; level < nlevels; ++level) {
-        float scale = mvInvScaleFactor[level];//获得当前层的比例
+        float scale = mvInvScaleFactor[level];//获得当前层的缩放比例
         //定义一个图像的大小
-        Size sz(cvRound((float) image.cols * scale), cvRound((float) image.rows * scale));
+        Size sz(cvRound((float) image.cols * scale), cvRound((float) image.rows * scale));//cvRound 四舍五入，取整
+
+        //扩大图像的边界，每条边往外扩展19个像素
         Size wholeSize(sz.width + EDGE_THRESHOLD * 2, sz.height + EDGE_THRESHOLD * 2);
         //设置一个类型与image一样的Mat变量，其中图像的大小是wholeSize
         Mat temp(wholeSize, image.type()), masktemp;
@@ -1162,7 +1167,6 @@ void ORBextractor::ComputePyramid(cv::Mat image) {
                            BORDER_REFLECT_101);
         }
     }
-
 }
 
 } //namespace ORB_SLAM

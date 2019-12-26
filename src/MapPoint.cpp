@@ -531,7 +531,7 @@ int MapPoint::PredictScale(const float &currentDist, Frame* pF)
     int nScale = ceil(log(ratio)/pF->mfLogScaleFactor);
     if(nScale<0)
         nScale = 0;
-    else if(nScale>=pF->mnScaleLevels)
+    else if(nScale >= pF->mnScaleLevels)
         nScale = pF->mnScaleLevels-1;
 
     return nScale;

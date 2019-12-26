@@ -251,7 +251,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     // Check reset
     {
         unique_lock<mutex> lock(mMutexReset);
-        if(mbReset)
+        if(mbReset)//mbReset变量是由Viewer中的按钮控制
         {
             mpTracker->Reset();
             mbReset = false;

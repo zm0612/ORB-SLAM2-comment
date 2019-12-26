@@ -121,9 +121,9 @@ public:
     static float fy;
     static float cx;
     static float cy;
-    static float invfx;
+    static float invfx;//fx的倒数
     static float invfy;
-    cv::Mat mDistCoef;
+    cv::Mat mDistCoef;//畸变参数矩阵，尺寸 4x1
 
     // Stereo baseline multiplied by fx.
     float mbf;
@@ -200,7 +200,7 @@ public:
     vector<float> mvInvLevelSigma2;
 
     // Undistorted Image Bounds (computed once).
-    // 用于确定画格子时的边界
+    //去畸变之后图像的四个顶点值
     static float mnMinX;
     static float mnMaxX;
     static float mnMinY;

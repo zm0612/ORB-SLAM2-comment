@@ -123,9 +123,9 @@ public:
 
 public:
 
-    static const int TH_LOW;
-    static const int TH_HIGH;
-    static const int HISTO_LENGTH;
+    static const int TH_LOW;// 相似变换描述子匹配阈值
+    static const int TH_HIGH;//欧式变换描述子匹配阈值
+    static const int HISTO_LENGTH;//匹配点对观察方向差的直方图格子数量
 
 
 protected:

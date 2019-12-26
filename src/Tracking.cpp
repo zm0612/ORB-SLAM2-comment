@@ -126,7 +126,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
 
     // Load ORB parameters
 
-    // 每一帧提取的特征点数 1000
+    // 每一帧提取的特征点数 2000
     int nFeatures = fSettings["ORBextractor.nFeatures"];
     // 图像建立金字塔时的变化尺度 1.2
     float fScaleFactor = fSettings["ORBextractor.scaleFactor"];
@@ -144,7 +144,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     if(sensor==System::STEREO)
         mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
-    // 在单目初始化的时候，会用mpIniORBextractor来作为特征点提取器
+    // 在单目初始化的时候，会用mpIniORBextractor来作为特征点提取器，并且提取关键点数量多一倍
     if(sensor==System::MONOCULAR)
         mpIniORBextractor = new ORBextractor(2*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 

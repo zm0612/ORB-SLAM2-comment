@@ -34,9 +34,10 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
-const int ORBmatcher::TH_HIGH = 100;
-const int ORBmatcher::TH_LOW = 50;
-const int ORBmatcher::HISTO_LENGTH = 30;
+// 阈值等参数
+const int ORBmatcher::TH_HIGH = 100;//相似变换描述子匹配阈值
+const int ORBmatcher::TH_LOW = 50;//欧式变换描述子匹配阈值
+const int ORBmatcher::HISTO_LENGTH = 30;//匹配点对观察方向差的直方图格子数量
 
 /**
  * Constructor
@@ -64,13 +65,13 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
 {
     int nmatches=0;
 
-    const bool bFactor = th!=1.0;
+    const bool bFactor = (th != 1.0);
 
     for(size_t iMP=0; iMP<vpMapPoints.size(); iMP++)
     {
         MapPoint* pMP = vpMapPoints[iMP];
 
-        // 判断该点是否要投影
+        //判断该点是否要投影
         if(!pMP->mbTrackInView)
             continue;
 
@@ -90,7 +91,8 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
 
         // 通过投影点(投影到当前帧,见isInFrustum())以及搜索窗口和预测的尺度进行搜索, 找出附近的兴趣点
         const vector<size_t> vIndices =
-                F.GetFeaturesInArea(pMP->mTrackProjX,pMP->mTrackProjY,r*F.mvScaleFactors[nPredictedLevel],nPredictedLevel-1,nPredictedLevel);
+                F.GetFeaturesInArea(pMP->mTrackProjX,pMP->mTrackProjY,
+                        r*F.mvScaleFactors[nPredictedLevel],nPredictedLevel-1,nPredictedLevel);
 
         if(vIndices.empty())
             continue;
@@ -108,7 +110,7 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
         {
             const size_t idx = *vit;
 
-            // 如果Frame中的该兴趣点已经有对应的MapPoint了,则退出该次循环
+            //如果Frame中的该兴趣点已经有对应的MapPoint了,则退出该次循环
             if(F.mvpMapPoints[idx])
                 if(F.mvpMapPoints[idx]->Observations()>0)
                     continue;
@@ -143,6 +145,7 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
         // Apply ratio to second match (only if best and second are in the same scale level)
         if(bestDist<=TH_HIGH)
         {
+            // 最好的匹配和次好的匹配在同一金字塔层级并且最短的距离不小于次短距离的80%
             if(bestLevel==bestLevel2 && bestDist>mfNNratio*bestDist2)
                 continue;
 
@@ -154,6 +157,7 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
     return nmatches;
 }
 
+///主要是用来计算一个小窗口，然后用于地图点与关键点的搜索
 float ORBmatcher::RadiusByViewingCos(const float &viewCos)
 {
     if(viewCos>0.998)
@@ -162,7 +166,14 @@ float ORBmatcher::RadiusByViewingCos(const float &viewCos)
         return 4.0;
 }
 
-
+/**
+  * @brief  检查 给出在匹配点对 是否在 极线范围内
+  * @Param kp1 帧1上的关键点kp1
+  * @Param  kp2  帧2 pKF2   上的关键点kp2
+  * @Param F12   帧1到帧2的基本矩阵F12    p2转置 * F * p1 = 0
+  * @Param pKF2  帧2 pKF2
+  * @return kp2 距离 kp1 在帧2图像上极线 的距离在合理范围内 足够小 认为有可能匹配
+*/
 bool ORBmatcher::CheckDistEpipolarLine(const cv::KeyPoint &kp1,const cv::KeyPoint &kp2,const cv::Mat &F12,const KeyFrame* pKF2)
 {
     // Epipolar line in second image l = x1'F12 = [a b c]

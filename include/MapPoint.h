@@ -98,6 +98,7 @@ public:
     float mTrackProjXR;
     int mnTrackScaleLevel;
     float mTrackViewCos;
+
     // TrackLocalMap - SearchByProjection中决定是否对该点进行投影的变量
     // mbTrackInView==false的点有几种：
     // a 已经和当前帧经过匹配（TrackReferenceKeyFrame，TrackWithMotionModel）但在优化过程中认为是外点

@@ -194,6 +194,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
  * 基线宽度（bf）
  * 靠近点或者远离点的阈值（thDepth）
 */
+///主要完成了：ORB关键的提取，计算去畸变之后的关键点坐标，如果是第一帧还会计算去畸变之后图像的四个顶点坐标
 Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
     :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
      mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth)
@@ -213,7 +214,7 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
     // ORB extraction
     ExtractORB(0,imGray);//提取ORB关键点和描述子
 
-    N = mvKeys.size();//获得关键点的尺寸
+    N = mvKeys.size();//获得关键点的数量
 
     if(mvKeys.empty())//如果关键点为空，那么初始化可能就要失败了
         return;
@@ -233,7 +234,7 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
     {
         ComputeImageBounds(imGray);//计算图像的边界
 
-
+        //图片去畸变之后的边长除以栅格边长的商的倒数
         mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(mnMaxX-mnMinX);
         mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(mnMaxY-mnMinY);
 
@@ -253,9 +254,10 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
     AssignFeaturesToGrid();
 }
 
+///@brief 将特征点按照坐标分配到64x48的格子中
 void Frame::AssignFeaturesToGrid()
 {
-    int nReserve = 0.5f*N/(FRAME_GRID_COLS*FRAME_GRID_ROWS);
+    int nReserve = 0.5f*N/(FRAME_GRID_COLS*FRAME_GRID_ROWS);// 0.5*N / 3072
 
     //调整mGrid的capacity
     for(unsigned int i=0; i<FRAME_GRID_COLS;i++)
@@ -264,7 +266,7 @@ void Frame::AssignFeaturesToGrid()
 
     // 在mGrid中记录了各特征点
     //将关键点对应的索引号i，存到它对应的Grid的容器中
-    for(int i=0;i<N;i++)
+    for(int i=0; i<N; i++)
     {
         const cv::KeyPoint &kp = mvKeysUn[i];
 
@@ -374,8 +376,8 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
     // V-D 4) 根据深度预测尺度（对应特征点在一层）
     const int nPredictedLevel = pMP->PredictScale(dist,this);
 
-    // Data used by the tracking
-    // 标记该点将来要被投影
+    //Data used by the tracking
+    //标记该点将来要被投影
     pMP->mbTrackInView = true;
     pMP->mTrackProjX = u;
     pMP->mTrackProjXR = u - mbf*invz; //该3D点投影到双目右侧相机上的横坐标
@@ -483,7 +485,7 @@ void Frame::ComputeBoW()
 // 调用OpenCV的矫正函数矫正orb提取的特征点
 void Frame::UndistortKeyPoints()
 {
-    // 如果没有图像是矫正过的，没有失真
+    // 如果畸矩阵第一个参数为零，则表示不需要去畸变
     if(mDistCoef.at<float>(0)==0.0)
     {
         mvKeysUn=mvKeys;
@@ -492,7 +494,7 @@ void Frame::UndistortKeyPoints()
 
     // Fill matrix with points
     // N为提取的特征点数量，将N个特征点保存在N*2的mat中
-    cv::Mat mat(N,2,CV_32F);
+    cv::Mat mat(N,2,CV_32F);//mat存放的是特征点的坐标
     for(int i=0; i<N; i++)
     {
         mat.at<float>(i,0)=mvKeys[i].pt.x;
@@ -501,8 +503,8 @@ void Frame::UndistortKeyPoints()
 
     // Undistort points
     // 调整mat的通道为2，矩阵的行列形状不变
-    mat=mat.reshape(2);
-    cv::undistortPoints(mat,mat,mK,mDistCoef,cv::Mat(),mK); // 用cv的函数进行失真校正
+    mat=mat.reshape(2);//调整为2通道之后，mat就变成了Nx1的矩阵
+    cv::undistortPoints(mat,mat,mK,mDistCoef,cv::Mat(),mK); // 用cv的函数对关键点进行畸变矫正
     mat=mat.reshape(1);
 
     // Fill undistorted keypoint vector
@@ -517,18 +519,27 @@ void Frame::UndistortKeyPoints()
     }
 }
 
+/**
+ * @brief 计算图像四个角上的点，在去畸变之后的坐标
+ *
+ * 输入：灰度图
+ */
 void Frame::ComputeImageBounds(const cv::Mat &imLeft)
 {
     if(mDistCoef.at<float>(0)!=0.0)
     {
         // 矫正前四个边界点：(0,0) (cols,0) (0,rows) (cols,rows)
         cv::Mat mat(4,2,CV_32F);
+
         mat.at<float>(0,0)=0.0;         //左上
 		mat.at<float>(0,1)=0.0;
+
         mat.at<float>(1,0)=imLeft.cols; //右上
 		mat.at<float>(1,1)=0.0;
+
 		mat.at<float>(2,0)=0.0;         //左下
 		mat.at<float>(2,1)=imLeft.rows;
+
         mat.at<float>(3,0)=imLeft.cols; //右下
 		mat.at<float>(3,1)=imLeft.rows;
 
